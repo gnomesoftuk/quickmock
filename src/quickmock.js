@@ -61,6 +61,14 @@
 
 		function setupInitializer(){
 			provider = initProvider();
+			if (opts.providerAs) {
+				// where the provider has no scope dependency defined but uses the providerAs definition
+				// we build a new scope and attach the provider to it using the supplied name
+				var newProvider = {};
+				newProvider.$scope = injector.get('$rootScope').$new();
+				newProvider.$scope[opts.providerAs] = provider;
+				provider = newProvider;
+			}
 			if(opts.spyOnProviderMethods){
 				spyOnProviderMethods(provider);
 			}
