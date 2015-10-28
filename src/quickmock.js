@@ -79,8 +79,11 @@
 					provider = newProvider;
 				}
 			}
+
 			provider.$mocks = mocks;
 			provider.$initialize = setupInitializer;
+			// handy to have rootScope available even if not explicity stated in the provider being tested
+			provider.$rootScope = injector.get('$rootScope');
 		}
 
 		function initProvider(){
