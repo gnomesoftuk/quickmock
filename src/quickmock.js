@@ -18,7 +18,8 @@
 			invokeQueue = modObj._invokeQueue || [],
 			providerType = getProviderType(opts.providerName, invokeQueue),
 			mocks = {},
-			provider = {};
+			provider = {},
+			isSetup = true;
 
 		angular.forEach(allModules || [], function(modName){
 			invokeQueue = invokeQueue.concat(angular.module(modName)._invokeQueue);
@@ -32,9 +33,9 @@
 				if(currProviderName === opts.providerName){
 					var currProviderDeps = providerData[2][1];
 
-                    if (angular.isFunction(currProviderDeps)) {
-                        currProviderDeps = currProviderDeps.$inject || injector.annotate(currProviderDeps);
-                    }
+					if (angular.isFunction(currProviderDeps)) {
+						currProviderDeps = currProviderDeps.$inject || injector.annotate(currProviderDeps);
+					}
 
 					for(var i=0; i<currProviderDeps.length - 1; i++){
 						var depName = currProviderDeps[i];
@@ -60,17 +61,23 @@
 
 
 		function setupInitializer(){
-			provider = initProvider();
-			if (opts.providerAs) {
-				// where the provider has no scope dependency defined but uses the providerAs definition
-				// we build a new scope and attach the provider to it using the supplied name
-				var newProvider = {};
-				newProvider.$scope = injector.get('$rootScope').$new();
-				newProvider.$scope[opts.providerAs] = provider;
-				provider = newProvider;
+			if (opts.deferInitialize && isSetup) {
+				provider = {};
+				isSetup = false;
 			}
-			if(opts.spyOnProviderMethods){
-				spyOnProviderMethods(provider);
+			else {
+				provider = initProvider();
+				if(opts.spyOnProviderMethods){
+					spyOnProviderMethods(provider);
+				}
+				if (opts.providerAs) {
+					// where the provider has no scope dependency defined but uses the providerAs definition
+					// we build a new scope and attach the provider to it using the supplied name
+					var newProvider = {};
+					newProvider.$scope = injector.get('$rootScope').$new();
+					newProvider.$scope[opts.providerAs] = provider;
+					provider = newProvider;
+				}
 			}
 			provider.$mocks = mocks;
 			provider.$initialize = setupInitializer;
@@ -140,7 +147,7 @@
 					mockServiceName = mockServiceName.replace(mockPrefix, '');
 				}else {
 					throw new Error('quickmock: Cannot inject mock for "' + depName + '" because no such mock exists. Please write a mock ' + depType + ' called "'
-					+ mockServiceName + '" (or set the useActualDependencies to true) and try again.');
+						+ mockServiceName + '" (or set the useActualDependencies to true) and try again.');
 				}
 			}
 			return injector.get(mockServiceName);
