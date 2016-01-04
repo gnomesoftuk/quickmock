@@ -13,17 +13,27 @@
 
 	function mockProvider(){
 		var allModules = opts.mockModules.concat(['ngMock']),
-			injector = angular.injector(allModules.concat([opts.moduleName])),
-			modObj = angular.module(opts.moduleName),
-			invokeQueue = modObj._invokeQueue || [],
-			providerType = getProviderType(opts.providerName, invokeQueue),
-			mocks = {},
-			provider = {},
-			isSetup = true;
+				injector = angular.injector(allModules.concat([opts.moduleName])),
+				modObj = angular.module(opts.moduleName),
+				invokeQueue = modObj._invokeQueue || [],
+				providerType = getProviderType(opts.providerName, invokeQueue),
+				mocks = {},
+				provider = {},
+				isSetup = true;
 
 		angular.forEach(allModules || [], function(modName){
 			invokeQueue = invokeQueue.concat(angular.module(modName)._invokeQueue);
 		});
+
+		angular.forEach(invokeQueue, function(providerData) {
+			// Remove any prefixed dependencies that persisted from a previous call,
+			// and check for any non-annotated services
+			sanitizeProvider(providerData, injector);
+		});
+
+		if(opts.inject){
+			injector.invoke(opts.inject);
+		}
 
 		if(providerType){
 			// Loop through invokeQueue, find this provider's dependencies and prefix
@@ -87,6 +97,10 @@
 			provider.$initialize = setupInitializer;
 			// handy to have rootScope available even if not explicity stated in the provider being tested
 			provider.$rootScope = injector.get('$rootScope');
+			// use the angular http mock rather than the quickmock one
+			provider.$mocks.$httpBackend = injector.get('$httpBackend');
+
+			return provider;
 		}
 
 		function initProvider(){
@@ -133,8 +147,10 @@
 
 		function getMockForProvider(depName, currProviderDeps, i){
 			var depType = getProviderType(depName, invokeQueue),
-				mockServiceName = depName;
-			if(opts.mocks[mockServiceName] && opts.mocks[mockServiceName] === quickmock.USE_ACTUAL){
+					mockServiceName = depName;
+			if(opts.mocks[mockServiceName] && opts.mocks[mockServiceName] !== quickmock.USE_ACTUAL){
+				return opts.mocks[mockServiceName];
+			}else if(opts.mocks[mockServiceName] && opts.mocks[mockServiceName] === quickmock.USE_ACTUAL){
 				quickmockLog('quickmock: Using actual implementation of "' + depName + '" ' + depType + ' instead of mock');
 			}else if(depType === 'value' || depType === 'constant'){
 				if(injector.has(mockPrefix + depName)){
@@ -153,7 +169,7 @@
 					mockServiceName = mockServiceName.replace(mockPrefix, '');
 				}else {
 					throw new Error('quickmock: Cannot inject mock for "' + depName + '" because no such mock exists. Please write a mock ' + depType + ' called "'
-						+ mockServiceName + '" (or set the useActualDependencies to true) and try again.');
+							+ mockServiceName + '" (or set the useActualDependencies to true) and try again.');
 				}
 			}
 			return injector.get(mockServiceName);
@@ -252,8 +268,8 @@
 			throw new Error('quickmock: Cannot compile "' + opts.providerName + '" directive. Html object does not contain $tag property.');
 		}
 		var htmlAttrs = html,
-			tagName = htmlAttrs.$tag,
-			htmlContent = htmlAttrs.$content;
+				tagName = htmlAttrs.$tag,
+				htmlContent = htmlAttrs.$content;
 		html = '<' + tagName + ' ';
 		angular.forEach(htmlAttrs, function(val, attr){
 			if(attr !== '$content' && attr !== '$tag'){
