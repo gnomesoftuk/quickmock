@@ -57,6 +57,9 @@
 			sanitizeProvider(providerData, injector);
 		});
 
+		provider.isLoaded = function () {
+			return provider.$initialize !== undefined;
+		};
 		return provider;
 
 
